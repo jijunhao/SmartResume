@@ -34,11 +34,7 @@ class PDFChecker:
             with pdfplumber.open(pdf_path) as pdf:
                 metadata = getattr(pdf, "metadata", None) or {}
             # PDF metadata keys may be with or without leading slash
-            producer = (
-                metadata.get("Producer")
-                or metadata.get("/Producer")
-                or ""
-            )
+            producer = metadata.get("Producer") or metadata.get("/Producer") or ""
             if isinstance(producer, bytes):
                 producer = producer.decode("utf-8", errors="ignore")
             else:

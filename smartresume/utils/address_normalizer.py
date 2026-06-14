@@ -129,12 +129,13 @@ class AddressNormalizer:
 
         matches.sort(key=lambda x: (x.weight, len(x.name or "")), reverse=True)
         if len(matches) > 1:
-            if (
-                matches[0].code_path
-                and matches[1].code_path
-                and matches[0].code_path in matches[1].code_path
-                and len(matches[1].code_path.split("/")) > len(matches[0].code_path.split("/"))
-            ):
+            both_have_paths = matches[0].code_path and matches[1].code_path
+            is_child = both_have_paths and matches[0].code_path in matches[1].code_path
+            depth_0 = len(matches[0].code_path.split("/"))
+            depth_1 = len(matches[1].code_path.split("/"))
+            child_deeper = depth_1 > depth_0
+            is_deeper = is_child and child_deeper
+            if is_deeper:
                 matches[0] = matches[1]
         match_res = matches[0] if matches else self.Node(None, None)
 

@@ -146,7 +146,10 @@ class Config:
         if hasattr(self, 'extract_channels') and self.extract_channels:
             for extract_type, channel_name in self.extract_channels.__dict__.items():
                 if channel_name and channel_name not in getattr(self, 'channels', {}):
-                    errors.append(f"Extract type {extract_type} references non-existent channel {channel_name}")
+                    errors.append(
+                        f"Extract type {extract_type} references "
+                        f"non-existent channel {channel_name}"
+                    )
 
         return errors
 
@@ -163,7 +166,10 @@ class Config:
                 # Update model config
                 if 'model' in yaml_config:
                     model_config = yaml_config['model']
-                    required_fields = ['name', 'api_url', 'api_key', 'max_tokens', 'temperature', 'top_p', 'seed']
+                    required_fields = [
+                        'name', 'api_url', 'api_key',
+                        'max_tokens', 'temperature', 'top_p', 'seed'
+                    ]
                     missing_fields = []
 
                     for field_name in required_fields:
@@ -173,7 +179,10 @@ class Config:
                             setattr(config.model, field_name, model_config[field_name])
 
                     if missing_fields:
-                        raise ValueError(f"Model config missing required fields: {', '.join(missing_fields)}")
+                        raise ValueError(
+                            "Model config missing required fields: "
+                            f"{', '.join(missing_fields)}"
+                        )
                 else:
                     raise ValueError("Configuration file missing required 'model' section")
 
@@ -246,7 +255,10 @@ class Config:
                 # Validate configuration
                 validation_errors = config.validate()
                 if validation_errors:
-                    raise ValueError(f"Configuration validation failed: {'; '.join(validation_errors)}")
+                    raise ValueError(
+                        "Configuration validation failed: "
+                        f"{'; '.join(validation_errors)}"
+                    )
 
                 return config
 

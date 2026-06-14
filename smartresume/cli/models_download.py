@@ -11,8 +11,8 @@ from loguru import logger
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
-from smartresume.utils.models_download_utils import download_model
-from smartresume.utils.model_paths import ModelType, ModelSource
+from smartresume.utils.models_download_utils import download_model  # noqa: E402
+from smartresume.utils.model_paths import ModelType, ModelSource  # noqa: E402
 
 
 @click.command()

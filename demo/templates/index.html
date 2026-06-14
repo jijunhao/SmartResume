@@ -628,7 +628,22 @@
 
     <script>
 
-        const API_ENDPOINT = '/analyze_resume_SmartResume';
+        const API_ENDPOINT = 'analyze_resume_SmartResume';
+        const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB, must match server
+
+        function escapeHtml(str) {
+            if (typeof str !== 'string') return str;
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
+
+        function escapeAndBreak(str) {
+            if (typeof str !== 'string') return str;
+            return escapeHtml(str).replace(/\n/g, '<br>');
+        }
 
         const dom = {
             filePreviewContainer: document.getElementById('file-preview-container'),
@@ -671,10 +686,16 @@
         
         async function handleDraggedFile(file) {
             if (!isFileTypeSupported(file)) {
-                showError(`不支持的文件类型: ${file.name}。请选择支持的格式：${SUPPORTED_FILE_TYPES.join(', ')}`);
+                showError(`不支持的文件类型: ${escapeHtml(file.name)}。请选择支持的格式：${SUPPORTED_FILE_TYPES.join(', ')}`);
                 return;
             }
 
+            if (file.size > MAX_FILE_SIZE) {
+                const maxMB = MAX_FILE_SIZE / (1024 * 1024);
+                const fileMB = (file.size / (1024 * 1024)).toFixed(1);
+                showError(`文件过大 (${fileMB}MB)，最大允许上传 ${maxMB}MB。`);
+                return;
+            }
 
             dom.errorDisplay.classList.add('hidden');
             dom.analysisTime.classList.add('hidden');
@@ -694,6 +715,10 @@
                     throw new Error(`服务器错误: ${response.status} ${response.statusText}`);
                 }
                 const data = await response.json();
+                if (data.error) {
+                    showError(`分析简历失败: ${escapeHtml(data.error)}`);
+                    return;
+                }
                 const duration = ((endTime - startTime) / 1000).toFixed(2);
                 dom.analysisTime.textContent = `解析耗时: ${duration}s`;
                 dom.analysisTime.classList.remove('hidden');
@@ -1021,8 +1046,8 @@
                     <div class="flex justify-center items-center h-full text-center text-gray-500 p-8">
                         <div class="text-center">
                             <h3 class="text-lg font-semibold">无法预览此文件类型</h3>
-                            <p class="mt-2 text-gray-500">文件: ${file.name}</p>
-                            <p class="mt-1 text-sm text-gray-400">浏览器不支持直接预览 <strong>.${extension}</strong> 文件。<br>但文件已上传，正在进行分析...</p>
+                            <p class="mt-2 text-gray-500">文件: ${escapeHtml(file.name)}</p>
+                            <p class="mt-1 text-sm text-gray-400">浏览器不支持直接预览 <strong>.${escapeHtml(extension)}</strong> 文件。<br>但文件已上传，正在进行分析...</p>
                         </div>
                     </div>`;
             }
@@ -1101,26 +1126,24 @@
             
 
             const degreeInfo = [];
-            if (edu.degreeLevel) degreeInfo.push(edu.degreeLevel);
-            if (edu.major) degreeInfo.push(edu.major);
+            if (edu.degreeLevel) degreeInfo.push(escapeHtml(edu.degreeLevel));
+            if (edu.major) degreeInfo.push(escapeHtml(edu.major));
             const degreeText = degreeInfo.join(' | ');
-            
 
-            const departmentText = edu.department ? `<p class="text-xs md:text-sm text-gray-600 mt-1">${edu.department}</p>` : '';
-            
+            const departmentText = edu.department ? `<p class="text-xs md:text-sm text-gray-600 mt-1">${escapeHtml(edu.department)}</p>` : '';
 
-            const educationDescription = edu.educationDescription ? 
+            const educationDescription = edu.educationDescription ?
                 `<div class="mt-2 md:mt-3">
-                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed">${edu.educationDescription.replace(/\n/g, '<br>')}</p>
+                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed">${escapeAndBreak(edu.educationDescription)}</p>
                 </div>` : '';
-            
+
             div.innerHTML = `
                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 md:mb-3">
                     <div class="flex items-center mb-1 sm:mb-0">
                         <div class="w-2 h-2 md:w-3 md:h-3 bg-emerald-500 rounded-full mr-2 md:mr-3 flex-shrink-0"></div>
-                        <h4 class="font-semibold text-gray-800 text-sm md:text-lg">${edu.school || '未知学校'}</h4>
+                        <h4 class="font-semibold text-gray-800 text-sm md:text-lg">${escapeHtml(edu.school || '未知学校')}</h4>
                     </div>
-                    <span class="text-xs text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full font-medium ml-4 sm:ml-0 self-start">${time}</span>
+                    <span class="text-xs text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full font-medium ml-4 sm:ml-0 self-start">${escapeHtml(time)}</span>
                 </div>
                 <div class="ml-4 md:ml-6">
                     ${degreeText ? `<p class="text-xs md:text-sm text-gray-700 font-medium">${degreeText}</p>` : ''}
@@ -1152,13 +1175,13 @@
                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 md:mb-3">
                     <div class="flex items-center mb-1 sm:mb-0">
                         <div class="w-2 h-2 md:w-3 md:h-3 ${dotColorClass} rounded-full mr-2 md:mr-3 flex-shrink-0"></div>
-                        <h4 class="font-semibold text-gray-800 text-sm md:text-lg">${exp.companyName || '未知公司'}${internshipBadge}</h4>
+                        <h4 class="font-semibold text-gray-800 text-sm md:text-lg">${escapeHtml(exp.companyName || '未知公司')}${internshipBadge}</h4>
                     </div>
-                    <span class="text-xs ${timeColorClass} px-2 py-1 rounded-full font-medium ml-4 sm:ml-0 self-start">${time}</span>
+                    <span class="text-xs ${timeColorClass} px-2 py-1 rounded-full font-medium ml-4 sm:ml-0 self-start">${escapeHtml(time)}</span>
                 </div>
                 <div class="ml-4 md:ml-6">
-                    <p class="text-xs md:text-sm text-gray-700 font-medium mb-1 md:mb-2">${exp.position || '未知职位'}</p>
-                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed">${(exp.jobDescription || '无职位描述').replace(/\n/g, '<br>')}</p>
+                    <p class="text-xs md:text-sm text-gray-700 font-medium mb-1 md:mb-2">${escapeHtml(exp.position || '未知职位')}</p>
+                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed">${escapeAndBreak(exp.jobDescription || '无职位描述')}</p>
                 </div>
             `;
             return div;
@@ -1173,13 +1196,13 @@
                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 md:mb-3">
                     <div class="flex items-center mb-1 sm:mb-0">
                         <div class="w-2 h-2 md:w-3 md:h-3 bg-orange-500 rounded-full mr-2 md:mr-3 flex-shrink-0"></div>
-                        <h4 class="font-semibold text-gray-800 text-sm md:text-lg">${proj.projectName || '未知项目'}</h4>
+                        <h4 class="font-semibold text-gray-800 text-sm md:text-lg">${escapeHtml(proj.projectName || '未知项目')}</h4>
                     </div>
-                    <span class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full font-medium ml-4 sm:ml-0 self-start">${time}</span>
+                    <span class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full font-medium ml-4 sm:ml-0 self-start">${escapeHtml(time)}</span>
                 </div>
                 <div class="ml-4 md:ml-6">
-                    <p class="text-xs md:text-sm text-gray-700 font-medium mb-1 md:mb-2">${proj.position || '未知角色'}</p>
-                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed">${(proj.projectDescription || '无项目描述').replace(/\n/g, '<br>')}</p>
+                    <p class="text-xs md:text-sm text-gray-700 font-medium mb-1 md:mb-2">${escapeHtml(proj.position || '未知角色')}</p>
+                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed">${escapeAndBreak(proj.projectDescription || '无项目描述')}</p>
                 </div>
             `;
             return div;
@@ -1194,7 +1217,7 @@
                     <h4 class="font-semibold text-gray-800 text-sm md:text-lg">专业技能</h4>
                 </div>
                 <div class="ml-4 md:ml-6">
-                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed whitespace-pre-line">${(skills.description || '暂无技能描述').replace(/\n/g, '<br>')}</p>
+                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed whitespace-pre-line">${escapeAndBreak(skills.description || '暂无技能描述')}</p>
                 </div>
             `;
             return div;
@@ -1209,7 +1232,7 @@
                     <h4 class="font-semibold text-gray-800 text-sm md:text-lg">个人优势</h4>
                 </div>
                 <div class="ml-4 md:ml-6">
-                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed whitespace-pre-line">${(strengths.description || '暂无个人优势描述').replace(/\n/g, '<br>')}</p>
+                    <p class="text-xs md:text-sm text-gray-600 leading-relaxed whitespace-pre-line">${escapeAndBreak(strengths.description || '暂无个人优势描述')}</p>
                 </div>
             `;
             return div;

@@ -40,7 +40,10 @@ def parse_single_resume(file_path: str, **kwargs) -> Dict[str, Any]:
         result = analyzer.pipeline(
             cv_path=file_path,
             resume_id=resume_id,
-            extract_types=kwargs.get('extract_types', ["basic_info", "work_experience", "education"])
+            extract_types=kwargs.get(
+                'extract_types',
+                ["basic_info", "work_experience", "education"]
+            )
         )
 
         if result is None:
@@ -56,7 +59,11 @@ def parse_single_resume(file_path: str, **kwargs) -> Dict[str, Any]:
 def main():
     parser = argparse.ArgumentParser(description='SmartResume')
     parser.add_argument('--file', type=str, required=True, help='Resume file path to parse')
-    parser.add_argument('--extract_types', nargs='+', default=['basic_info', 'work_experience', 'education'], help='Extraction types')
+    parser.add_argument(
+        '--extract_types', nargs='+',
+        default=['basic_info', 'work_experience', 'education'],
+        help='Extraction types'
+    )
 
     args = parser.parse_args()
 

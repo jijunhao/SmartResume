@@ -107,7 +107,10 @@ class TextExtractor:
                         # Extract images (if any)
                         if hasattr(page, 'images'):
                             for img in page.images:
-                                page_images.append([img['x0'], img['top'], img['x1'], img['bottom']])
+                                page_images.append([
+                                    img['x0'], img['top'],
+                                    img['x1'], img['bottom']
+                                ])
 
                         pages_data.append(page_texts)
 
@@ -184,7 +187,10 @@ class TextExtractor:
         except Exception:
             return []
 
-    def resort_page_text_with_location(self, page_texts: List[Dict[str, Any]], page_num: int) -> List[Dict[str, Any]]:
+    def resort_page_text_with_location(
+        self, page_texts: List[Dict[str, Any]],
+        page_num: int
+    ) -> List[Dict[str, Any]]:
         """
         Resort page texts by bbox position, with line-tolerance fine-tune.
 
@@ -419,7 +425,10 @@ class TextExtractor:
 
                     page_data = {
                         'page_number': page_num + 1,
-                        'text': [{'text': text, 'confidence': 1.0}] if text and text.strip() else [],
+                        'text': (
+                            [{'text': text, 'confidence': 1.0}]
+                            if text and text.strip() else []
+                        ),
                         'source': 'pdf_text'
                     }
 
@@ -470,7 +479,10 @@ class TextExtractor:
         except Exception:
             raise
 
-    def add_ocr_to_page_text(self, page_data: Dict[str, Any], ocr_result: List[Any]) -> Dict[str, Any]:
+    def add_ocr_to_page_text(
+        self, page_data: Dict[str, Any],
+        ocr_result: List[Any]
+    ) -> Dict[str, Any]:
         """
         Add OCR results into page text data.
 

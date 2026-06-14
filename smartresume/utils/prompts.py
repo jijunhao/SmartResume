@@ -17,8 +17,14 @@ BASIC_INFO_PROMPT = """
     "age":"", # 当前年龄
     "born": "", # 出生年  如 1996-11
     "gender": "", # 男/女 若不存在 则不填
-    "desiredLocation": ["城市名", ...], # 意向期望目标工作地/城市 可以填写多个 如果仅存在一个 只需要填写一个   e.g: "[北京市,上海市]"  **简历中需要明确说明是期望城市** 一般出现在同一行(若多个则使用"," ";" 隔开) 若不存在填 [] 例如("求职目标：填写意向岗位) 应该填写为 "desiredLocation": []
-    "currentLocation": "城市名"  # 现居地/当前城市 xxx省xx市  **不要出现籍贯中的地址**    **不要从工作经历中推测现居地 要写明现居地**
+    "desiredLocation": ["城市名", ...],
+    # 意向期望目标工作地/城市 可以填写多个 如果仅存在一个 只需要填写一个
+    # e.g: "[北京市,上海市]" **简历中需要明确说明是期望城市**
+    # 一般出现在同一行(若多个则使用"," ";" 隔开) 若不存在填 []
+    # 例如("求职目标：填写意向岗位) 应该填写为 "desiredLocation": []
+    "currentLocation": "城市名"
+    # 现居地/当前城市 xxx省xx市 **不要出现籍贯中的地址**
+    # **不要从工作经历中推测现居地 要写明现居地**
     "placeOfOrigin": "" # 籍贯 不要和 现居地/当前城市 混淆
   },
 }
@@ -36,9 +42,18 @@ WORK_EXPERIENCE_PROMPT = """{
       "internship": 0, #该段经历是否是实习 如果是实习则为1  不是实习为0
       "jobDescription_refer_index_range": [start_index,end_index]   # List
        # 如果不存在 就写 []。请勿和项目描述混淆
-       # jobDescription_refer_index_range字段的定义: 指工作经历描述的原文引用的段落index范围 一般情况下包括了工作成果 业绩 主要工作 项目背景 使用的技术栈 工作描述等 尽可能写全 直到下一段工作经历为止。
-       # jobDescription_refer_index_range不包括companyName字段 employmentPeriod字段 position字段。请勿将companyName字段 employmentPeriod字段 position字段写入描述范围。
-       # jobDescription_refer_index_range不包括companyName字段 employmentPeriod字段 position字段。请勿将companyName字段 employmentPeriod字段 position字段写入描述范围。
+       # jobDescription_refer_index_range字段的定义:
+       # 指工作经历描述的原文引用的段落index范围
+       # 一般情况下包括了工作成果 业绩 主要工作 项目背景
+       # 使用的技术栈 工作描述等 尽可能写全 直到下一段工作经历为止。
+       # jobDescription_refer_index_range不包括
+       # companyName字段 employmentPeriod字段 position字段。
+       # 请勿将companyName字段 employmentPeriod字段
+       # position字段写入描述范围。
+       # jobDescription_refer_index_range不包括
+       # companyName字段 employmentPeriod字段 position字段。
+       # 请勿将companyName字段 employmentPeriod字段
+       # position字段写入描述范围。
        # 如下示例1
        # [22]: 阿里巴巴 2021.11-2022.11
        # [22]: 工作描述: 从事地推工作完成xx业绩
@@ -50,7 +65,9 @@ WORK_EXPERIENCE_PROMPT = """{
        # [23]: 在地推任务中考核为A
        # [...]:  ...
        # [40]: 为公司地推活动的圆满结束贡献了xxx销售业绩。
-       # 若 "jobDescription_refer_index_range": [22,40] 则代表从段落index 从22到40的所有内容。(包含22和40本身) 即  22 + 23 + 24 .... + 39 + 40
+       # 若 "jobDescription_refer_index_range": [22,40]
+       # 则代表从段落index 从22到40的所有内容。
+       # (包含22和40本身) 即 22 + 23 + 24 .... + 39 + 40
     }, ...
   ]
   }

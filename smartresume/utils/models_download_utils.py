@@ -14,7 +14,11 @@ except ImportError:
 from .model_paths import ModelPath, ModelType, ModelSource
 
 
-def auto_download_and_get_model_path(relative_path: str, model_type: ModelType = ModelType.LLM, save_path: Optional[str] = None) -> str:
+def auto_download_and_get_model_path(
+    relative_path: str,
+    model_type: ModelType = ModelType.LLM,
+    save_path: Optional[str] = None
+) -> str:
 
     model_source = os.getenv('SMARTRESUME_MODEL_SOURCE', "modelscope")
 
@@ -52,7 +56,12 @@ def auto_download_and_get_model_path(relative_path: str, model_type: ModelType =
                 local_dir=save_path
             )
         else:
-            cache_dir = snapshot_download(repo, allow_patterns=[relative_path, relative_path + "/*"])
+            cache_dir = snapshot_download(
+                repo,
+                allow_patterns=[
+                    relative_path, relative_path + "/*"
+                ]
+            )
     elif model_type == ModelType.LAYOUT:
         relative_path = relative_path.strip('/')
         if save_path:
@@ -60,11 +69,18 @@ def auto_download_and_get_model_path(relative_path: str, model_type: ModelType =
             os.makedirs(save_path, exist_ok=True)
             cache_dir = snapshot_download(
                 repo,
-                allow_patterns=[relative_path, relative_path + "/*"],
+                allow_patterns=[
+                    relative_path, relative_path + "/*"
+                ],
                 local_dir=save_path
             )
         else:
-            cache_dir = snapshot_download(repo, allow_patterns=[relative_path, relative_path + "/*"])
+            cache_dir = snapshot_download(
+                repo,
+                allow_patterns=[
+                    relative_path, relative_path + "/*"
+                ]
+            )
 
     if not cache_dir:
         raise FileNotFoundError(f"Failed to download model: {relative_path} from {repo}")
@@ -77,24 +93,37 @@ def get_model_path(model_type: ModelType) -> Optional[str]:
     return config.model_download.get('models_dir', {}).get(model_type.value)
 
 
-def download_model(model_type: ModelType, model_source: Optional[ModelSource] = None, save_path: Optional[str] = None) -> str:
+def download_model(
+    model_type: ModelType,
+    model_source: Optional[ModelSource] = None,
+    save_path: Optional[str] = None
+) -> str:
     if model_source:
         os.environ['SMARTRESUME_MODEL_SOURCE'] = model_source.value
 
     if model_type == ModelType.LLM:
-        return auto_download_and_get_model_path(ModelPath.QWEN3_0_6B.value, ModelType.LLM, save_path)
+        return auto_download_and_get_model_path(
+            ModelPath.QWEN3_0_6B.value, ModelType.LLM, save_path
+        )
     elif model_type == ModelType.LAYOUT:
-        return auto_download_and_get_model_path(ModelPath.YOLOV10_MODEL.value, ModelType.LAYOUT, save_path)
+        return auto_download_and_get_model_path(
+            ModelPath.YOLOV10_MODEL.value, ModelType.LAYOUT,
+            save_path
+        )
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
 
 if __name__ == '__main__':
     try:
-        llm_path = auto_download_and_get_model_path(ModelPath.QWEN3_0_6B.value, ModelType.LLM)
+        llm_path = auto_download_and_get_model_path(
+            ModelPath.QWEN3_0_6B.value, ModelType.LLM
+        )
         print(f"LLM model path: {llm_path}")
 
-        layout_path = auto_download_and_get_model_path(ModelPath.YOLOV10_MODEL.value, ModelType.LAYOUT)
+        layout_path = auto_download_and_get_model_path(
+            ModelPath.YOLOV10_MODEL.value, ModelType.LAYOUT
+        )
         print(f"Layout model path: {layout_path}")
 
     except Exception as e:

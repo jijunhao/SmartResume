@@ -37,7 +37,8 @@ class ResumeAnalyzer:
             extract_types: List of extraction types (e.g. basic_info, work_experience, education)
 
         Returns:
-            Dict with extracted fields (basicInfo, workExperience, education, etc.), rawText, and optional error_details.
+            Dict with extracted fields (basicInfo, workExperience,
+            education, etc.), rawText, and optional error_details.
 
         Note:
             When PDF is abnormal (is_abnormal_pdf), uses dual-text strategy:
@@ -53,11 +54,18 @@ class ResumeAnalyzer:
 
             if is_abnormal_pdf:
                 # Dual-text strategy: full OCR text + hybrid text
-                text_lines, text_content, indexed_text_content = self.data_processor.build_text_content(
-                    processed_data, resume_id
+                (text_lines, text_content,
+                 indexed_text_content) = (
+                    self.data_processor.build_text_content(
+                        processed_data, resume_id
+                    )
                 )
-                text_lines_hybrid, text_content_hybrid, indexed_text_content_hybrid = self.data_processor.build_text_content(
-                    processed_data, resume_id, use_hybrid_text=True
+                (text_lines_hybrid, text_content_hybrid,
+                 indexed_text_content_hybrid) = (
+                    self.data_processor.build_text_content(
+                        processed_data, resume_id,
+                        use_hybrid_text=True
+                    )
                 )
 
                 basic_info_output = {}
@@ -93,8 +101,11 @@ class ResumeAnalyzer:
 
                 raw_text = text_content_hybrid
             else:
-                text_lines, text_content, indexed_text_content = self.data_processor.build_text_content(
-                    processed_data, resume_id
+                (text_lines, text_content,
+                 indexed_text_content) = (
+                    self.data_processor.build_text_content(
+                        processed_data, resume_id
+                    )
                 )
                 structure_output = self.llm_client.extract_info(
                     indexed_text_content, extract_types, resume_id
@@ -131,7 +142,10 @@ class ResumeAnalyzer:
 
         return self.file_processor.process_file(file_path)
 
-    def extract_info_only(self, text_content: str, extract_types: List[str], resume_id: str) -> Dict[str, Any]:
+    def extract_info_only(
+        self, text_content: str, extract_types: List[str],
+        resume_id: str
+    ) -> Dict[str, Any]:
         """
         Extract information only (no file processing).
 

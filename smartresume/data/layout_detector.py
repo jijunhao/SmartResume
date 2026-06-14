@@ -30,7 +30,11 @@ class SimpleONNXYOLODetector:
         self.iou_threshold = 0.45
 
         if providers is None:
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if ort.get_device() == 'GPU' else ['CPUExecutionProvider']
+            providers = (
+                ['CUDAExecutionProvider', 'CPUExecutionProvider']
+                if ort.get_device() == 'GPU'
+                else ['CPUExecutionProvider']
+            )
 
         self.providers = providers
         self.load_model(model_path)
@@ -51,7 +55,9 @@ class SimpleONNXYOLODetector:
         except Exception as e:
             raise RuntimeError(f"Failed to load ONNX model: {e}")
 
-    def preprocess_image(self, image: np.ndarray, target_size: int = 640) -> Tuple[np.ndarray, float]:
+    def preprocess_image(
+        self, image: np.ndarray, target_size: int = 640
+    ) -> Tuple[np.ndarray, float]:
         """Preprocess image for ONNX inference"""
         if len(image.shape) != 3:
             raise ValueError("Input must be a 3D array (H, W, C)")
@@ -150,7 +156,10 @@ class LayoutDetector:
                     from ..utils.models_download_utils import download_model
                     from ..utils.model_paths import ModelType, ModelSource
                     print("Layout model not found, auto-downloading...")
-                    download_path = download_model(ModelType.LAYOUT, ModelSource.MODELSCOPE, config_path or 'models')
+                    download_path = download_model(
+                        ModelType.LAYOUT, ModelSource.MODELSCOPE,
+                        config_path or 'models'
+                    )
                     model_path = os.path.join(download_path, 'yolov10', 'best.onnx')
 
             except Exception as e:
@@ -167,7 +176,10 @@ class LayoutDetector:
                 if os.path.exists(onnx_path):
                     self.detector = SimpleONNXYOLODetector(onnx_path)
                 else:
-                    raise RuntimeError(f"ONNX model not found. Please convert {model_path} to ONNX format first.")
+                    raise RuntimeError(
+                        f"ONNX model not found. Please convert "
+                        f"{model_path} to ONNX format first."
+                    )
 
             self.original_image = None
             print("Using ONNX-based layout detector")
@@ -196,7 +208,10 @@ class LayoutDetector:
         with open(output_path, "w") as f:
             json.dump(results, f, indent=2)
 
-    def save_image(self, formatted_results: List[Dict[str, Any]], output_path: str = "detected_output.jpg") -> None:
+    def save_image(
+        self, formatted_results: List[Dict[str, Any]],
+        output_path: str = "detected_output.jpg"
+    ) -> None:
         """
         Draw detection results on the original image and save it
         :param formatted_results: List of detection results with x1, y1, x2, y2

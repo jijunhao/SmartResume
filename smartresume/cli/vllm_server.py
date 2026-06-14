@@ -10,8 +10,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from smartresume.utils.models_download_utils import auto_download_and_get_model_path
-from smartresume.utils.model_paths import ModelPath, ModelType
+from smartresume.utils.models_download_utils import auto_download_and_get_model_path  # noqa: E402
+from smartresume.utils.model_paths import ModelPath, ModelType  # noqa: E402
 
 try:
     from vllm.entrypoints.cli.main import main as vllm_main

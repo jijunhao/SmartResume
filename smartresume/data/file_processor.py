@@ -8,12 +8,24 @@ import cv2
 import base64
 import io
 import string
+import uuid
+import zipfile
 import numpy as np
 from PIL import Image
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Tuple
 from smartresume.data.text_extractor import TextExtractor
 from smartresume.utils.config import config
 from smartresume.data.layout_detector import LayoutDetector
+
+MAX_ZIP_FILE_SIZE = 50 * 1024 * 1024  # 50MB per file
+MAX_ZIP_TOTAL_SIZE = 200 * 1024 * 1024  # 200MB total
+MAX_ZIP_FILE_COUNT = 200
+ALLOWED_ZIP_PREFIXES = ('word/document.xml', 'word/media/', 'word/header', 'word/footer')
+ALLOWED_EXTENSIONS = {
+    '.docx', '.doc', '.docm', '.dotx', '.dotm', '.xls',
+    '.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.bmp',
+    '.txt', '.md', '.html'
+}
 
 
 class FileProcessor:
@@ -27,25 +39,67 @@ class FileProcessor:
             self.layout_detector = LayoutDetector()
 
     @staticmethod
+    def _validate_zip_safety(zip_path: str) -> None:
+        """Validate ZIP file against zip bomb and malicious entries."""
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            total_size = 0
+            file_count = 0
+            for info in z.infolist():
+                file_count += 1
+                if file_count > MAX_ZIP_FILE_COUNT:
+                    raise ValueError(f"ZIP file contains too many entries (>{MAX_ZIP_FILE_COUNT})")
+                if info.file_size > MAX_ZIP_FILE_SIZE:
+                    raise ValueError(
+                        f"ZIP entry '{info.filename}' exceeds size limit "
+                        f"({info.file_size} > {MAX_ZIP_FILE_SIZE})"
+                    )
+                total_size += info.file_size
+                if total_size > MAX_ZIP_TOTAL_SIZE:
+                    raise ValueError(
+                        f"ZIP total uncompressed size exceeds "
+                        f"limit (>{MAX_ZIP_TOTAL_SIZE})"
+                    )
+
+    @staticmethod
+    def _is_allowed_zip_entry(name: str) -> bool:
+        """Check if a ZIP entry path is in the whitelist."""
+        return any(name.startswith(prefix) or name == prefix for prefix in ALLOWED_ZIP_PREFIXES)
+
+    @staticmethod
+    def _sanitize_file_path(file_path: str) -> str:
+        """Sanitize file path by copying to a safe temp location with UUID name if needed."""
+        basename = os.path.basename(file_path)
+        if re.search(r'[;&|`$(){}!<>]', basename):
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext not in ALLOWED_EXTENSIONS:
+                raise ValueError(f"Unsupported file extension: {ext}")
+            import tempfile
+            import shutil
+            safe_path = os.path.join(tempfile.gettempdir(), f"sr_{uuid.uuid4().hex}{ext}")
+            shutil.copy2(file_path, safe_path)
+            return safe_path
+        return file_path
+
+    @staticmethod
     def _garbled_ratio(text: str) -> float:
         """Compute garbled ratio in text supporting major language charsets"""
         if not text:
             return 1.0
 
         def is_valid(c: str) -> bool:
-            return (
-                c in string.printable or
-                '\u4e00' <= c <= '\u9fff' or
-                '\u0400' <= c <= '\u04FF' or
-                '\u00C0' <= c <= '\u024F' or
-                '\u1EA0' <= c <= '\u1EFF' or
-                '\u0600' <= c <= '\u06FF' or
-                '\u0900' <= c <= '\u097F' or
-                '\u0E00' <= c <= '\u0E7F' or
-                '\u3040' <= c <= '\u309F' or
-                '\u30A0' <= c <= '\u30FF' or
-                '\uAC00' <= c <= '\uD7AF'
-            )
+            return any([
+                c in string.printable,
+                '\u4e00' <= c <= '\u9fff',
+                '\u0400' <= c <= '\u04FF',
+                '\u00C0' <= c <= '\u024F',
+                '\u1EA0' <= c <= '\u1EFF',
+                '\u0600' <= c <= '\u06FF',
+                '\u0900' <= c <= '\u097F',
+                '\u0E00' <= c <= '\u0E7F',
+                '\u3040' <= c <= '\u309F',
+                '\u30A0' <= c <= '\u30FF',
+                '\uAC00' <= c <= '\uD7AF',
+            ])
 
         valid_chars = sum(1 for c in text if is_valid(c))
         ratio = 1.0 - valid_chars / len(text)
@@ -53,7 +107,16 @@ class FileProcessor:
 
     def process_file(self, file_path: str) -> List[Dict[str, Any]]:
         """Process a file, choosing the appropriate method based on type"""
+        file_path = self._sanitize_file_path(file_path)
         file_ext = os.path.splitext(file_path)[1].lower()
+
+        if file_ext not in ALLOWED_EXTENSIONS:
+            raise ValueError(
+                f"Unsupported file format: {file_ext}. Supported: "
+                "PDF, images (.jpg/.jpeg/.png/.tiff/.bmp), "
+                "Word (.docx/.doc/.docm/.dotx/.dotm/.xls), "
+                "text (.txt/.md/.html)"
+            )
 
         if file_ext in ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']:
             return self._process_image(file_path)
@@ -65,8 +128,10 @@ class FileProcessor:
             return self._process_text(file_path)
         else:
             raise ValueError(
-                f"Unsupported file format: {file_ext}. Supported: PDF, images (.jpg/.jpeg/.png/.tiff/.bmp), "
-                "Word (.docx/.doc/.docm/.dotx/.dotm/.xls), text (.txt/.md/.html)"
+                f"Unsupported file format: {file_ext}. Supported: "
+                "PDF, images (.jpg/.jpeg/.png/.tiff/.bmp), "
+                "Word (.docx/.doc/.docm/.dotx/.dotm/.xls), "
+                "text (.txt/.md/.html)"
             )
 
     def _process_image(self, image_path: str) -> List[Dict[str, Any]]:
@@ -92,9 +157,18 @@ class FileProcessor:
         page_data = self.text_extractor.add_ocr_to_page_text(page_data, ocr_results)
         if config.layout_detection.enabled:
             layout_location = self.layout_detector.detect(image.copy())
-            sorted_results = self.text_extractor.resort_page_text_with_layout(page_data['text'], 0, layout_location)
+            sorted_results = (
+                self.text_extractor.resort_page_text_with_layout(
+                    page_data['text'], 0, layout_location
+                )
+            )
         else:
-            sorted_results = self.text_extractor.resort_page_text_with_center_location(page_data['text'], 0)
+            sorted_results = (
+                self.text_extractor
+                .resort_page_text_with_center_location(
+                    page_data['text'], 0
+                )
+            )
 
         image_base64 = self._image_to_base64(image)
         return [{'text': sorted_results, 'image': image_base64}]
@@ -160,26 +234,34 @@ class FileProcessor:
 
         extracted_text = self._extract_word_text(word_path)
         if extracted_text.strip():
-            return [{'text': [{'text': line} for line in extracted_text.split("\n") if line.strip()]}]
+            return [{'text': [
+                {'text': line}
+                for line in extracted_text.split("\n")
+                if line.strip()
+            ]}]
         return [{'text': []}]
 
     def _extract_docx_images_ocr(self, docx_path: str) -> List[str]:
         """Extract images from docx package and run OCR on them."""
-        import zipfile
         import tempfile
         import shutil
 
         if not self.text_extractor.ocr:
             return []
 
+        self._validate_zip_safety(docx_path)
+
         temp_dir = tempfile.mkdtemp(prefix="docx_extraction_")
         ocr_lines: List[str] = []
 
         try:
             with zipfile.ZipFile(docx_path, "r") as zip_ref:
-                image_files = [f for f in zip_ref.namelist() if f.startswith("word/media/")]
+                image_files = [f for f in zip_ref.namelist()
+                               if self._is_allowed_zip_entry(f) and f.startswith("word/media/")]
                 for img_path in image_files:
                     img_filename = os.path.basename(img_path)
+                    if not img_filename:
+                        continue
                     output_path = os.path.join(temp_dir, img_filename)
                     with zip_ref.open(img_path) as source, open(output_path, "wb") as target:
                         target.write(source.read())
@@ -200,34 +282,35 @@ class FileProcessor:
         return ocr_lines
 
     def _extract_word_text(self, word_path: str) -> str:
-        """Extract text from Word document using available parser."""
+        """Extract text from Word document using safe pure-Python parsers."""
         try:
-            import textract
-            return textract.process(word_path).decode('utf-8')
+            import docx2txt
+            return docx2txt.process(word_path)
         except Exception:
             try:
-                import docx2txt
-                return docx2txt.process(word_path)
+                from docx import Document
+                doc = Document(word_path)
+                return "\n".join([paragraph.text for paragraph in doc.paragraphs])
             except Exception:
-                try:
-                    from docx import Document
-                    doc = Document(word_path)
-                    return "\n".join([paragraph.text for paragraph in doc.paragraphs])
-                except Exception:
-                    return ""
+                return ""
 
     def _extract_leaf_tables_from_xml(self, docx_path: str) -> List[Dict[str, Any]]:
         """Extract paragraphs and leaf-table text blocks from docx XML."""
-        import zipfile
         try:
             from bs4 import BeautifulSoup
         except Exception:
             return []
 
+        self._validate_zip_safety(docx_path)
+
         results = []
         try:
             with zipfile.ZipFile(docx_path, 'r') as z:
+                if 'word/document.xml' not in z.namelist():
+                    return []
                 xml_content = z.read('word/document.xml')
+                if len(xml_content) > 10 * 1024 * 1024:
+                    raise ValueError("XML content exceeds 10MB size limit")
                 soup = BeautifulSoup(xml_content, 'xml')
                 body = soup.find('body')
                 if not body:
@@ -258,7 +341,10 @@ class FileProcessor:
                         para_text = "".join([t.get_text() for t in child.find_all('t')]).strip()
                         if para_text:
                             hex_chars = set('0123456789ABCDEFabcdef')
-                            if len(para_text) > 200 and all(c in hex_chars or c.isspace() for c in para_text):
+                            is_hex_blob = len(para_text) > 200 and all(
+                                c in hex_chars or c.isspace() for c in para_text
+                            )
+                            if is_hex_blob:
                                 continue
                             results.append({'type': 'paragraph', 'text': para_text})
 
@@ -311,7 +397,10 @@ class FileProcessor:
     def _process_pdf_with_ocr(self, pdf_path: str) -> List[Dict[str, Any]]:
         """Process PDF combining text extraction and OCR"""
         page_texts, images, _ = self._unpack_extract_with_positions(
-            self.text_extractor.extract_with_positions(pdf_path, extract_text=True, extract_render_img=True)
+            self.text_extractor.extract_with_positions(
+                pdf_path, extract_text=True,
+                extract_render_img=True
+            )
         )
         # images = self._pdf_to_images(pdf_path)
         results = []
@@ -325,7 +414,10 @@ class FileProcessor:
             new_w = int(w * new_size)
             new_h = int(h * new_size)
 
-            blacked_out_image = cv2.resize(blacked_out_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            blacked_out_image = cv2.resize(
+                blacked_out_image, (new_w, new_h),
+                interpolation=cv2.INTER_AREA
+            )
 
             ocr_results = self.text_extractor.ocr_extract(blacked_out_image)
             ocr_results = self.restore_ocr_coordinates(ocr_results, new_size)
@@ -340,9 +432,20 @@ class FileProcessor:
 
             if config.layout_detection.enabled:
                 layout_location = self.layout_detector.detect(img.copy())
-                sorted_texts = self.text_extractor.resort_page_text_with_layout(combined_page_data['text'], page_num, layout_location)
+                sorted_texts = (
+                    self.text_extractor
+                    .resort_page_text_with_layout(
+                        combined_page_data['text'],
+                        page_num, layout_location
+                    )
+                )
             else:
-                sorted_texts = self.text_extractor.resort_page_text_with_center_location(combined_page_data['text'], page_num)
+                sorted_texts = (
+                    self.text_extractor
+                    .resort_page_text_with_center_location(
+                        combined_page_data['text'], page_num
+                    )
+                )
 
             image_base64 = self._image_to_base64(img)
 
@@ -400,14 +503,20 @@ class FileProcessor:
 
         return restored_results
 
-    def _process_pdf_ocr_only(self, pdf_path: str, garbled_ratio: float = 0.0) -> List[Dict[str, Any]]:
+    def _process_pdf_ocr_only(
+            self, pdf_path: str,
+            garbled_ratio: float = 0.0
+    ) -> List[Dict[str, Any]]:
         """
         Process PDF in OCR-only mode.
 
         When PDF image-bbox metadata is available, also build `text_hybrid` by mixing
         PDF text and OCR text in image regions. Otherwise fallback to OCR-only output.
         """
-        extracted = self.text_extractor.extract_with_positions(pdf_path, extract_text=True, extract_render_img=True)
+        extracted = self.text_extractor.extract_with_positions(
+            pdf_path, extract_text=True,
+            extract_render_img=True
+        )
         pdf_raw_texts, images, pages_image_bboxes = self._unpack_extract_with_positions(extracted)
         if not pdf_raw_texts:
             pdf_raw_texts = [[] for _ in range(len(images))]
@@ -432,16 +541,36 @@ class FileProcessor:
             }
             page_data_ocr = self.text_extractor.add_ocr_to_page_text(page_data_ocr, ocr_results)
             if config.layout_detection.enabled:
-                layout_location = self.layout_detector.detect(resized_img.copy())
-                sorted_texts_ocr = self.text_extractor.resort_page_text_with_layout(page_data_ocr['text'], page_num, layout_location)
+                layout_location = self.layout_detector.detect(
+                    resized_img.copy()
+                )
+                sorted_texts_ocr = (
+                    self.text_extractor
+                    .resort_page_text_with_layout(
+                        page_data_ocr['text'],
+                        page_num, layout_location
+                    )
+                )
             else:
-                sorted_texts_ocr = self.text_extractor.resort_page_text_with_center_location(page_data_ocr['text'], page_num)
+                sorted_texts_ocr = (
+                    self.text_extractor
+                    .resort_page_text_with_center_location(
+                        page_data_ocr['text'], page_num
+                    )
+                )
 
             if garbled_ratio > 0.15:
                 sorted_texts_hybrid = sorted_texts_ocr
             else:
-                page_pdf_texts = pdf_raw_texts[page_num] if page_num < len(pdf_raw_texts) else []
-                page_image_bboxes = pages_image_bboxes[page_num] if page_num < len(pages_image_bboxes) else []
+                page_pdf_texts = (
+                    pdf_raw_texts[page_num]
+                    if page_num < len(pdf_raw_texts) else []
+                )
+                page_image_bboxes = (
+                    pages_image_bboxes[page_num]
+                    if page_num < len(pages_image_bboxes)
+                    else []
+                )
                 hybrid_texts = []
                 pattern = r'^[a-zA-Z0-9\-~_]{40,}$'
                 for pdf_text_item in page_pdf_texts:
@@ -454,17 +583,40 @@ class FileProcessor:
                         hybrid_texts.append(pdf_text_item)
 
                 if page_image_bboxes and ocr_results:
-                    hybrid_texts.extend(self._filter_ocr_in_image_regions(ocr_results, page_image_bboxes))
+                    hybrid_texts.extend(
+                        self._filter_ocr_in_image_regions(
+                            ocr_results, page_image_bboxes
+                        )
+                    )
 
-                hybrid_text_length = sum(len(item.get('text', '').strip()) for item in hybrid_texts if isinstance(item, dict))
+                hybrid_text_length = sum(
+                    len(item.get('text', '').strip())
+                    for item in hybrid_texts
+                    if isinstance(item, dict)
+                )
                 if hybrid_text_length < 20:
                     sorted_texts_hybrid = sorted_texts_ocr
                 else:
                     if config.layout_detection.enabled:
-                        layout_location = self.layout_detector.detect(resized_img.copy())
-                        sorted_texts_hybrid = self.text_extractor.resort_page_text_with_layout(hybrid_texts, page_num, layout_location)
+                        layout_location = (
+                            self.layout_detector.detect(
+                                resized_img.copy()
+                            )
+                        )
+                        sorted_texts_hybrid = (
+                            self.text_extractor
+                            .resort_page_text_with_layout(
+                                hybrid_texts, page_num,
+                                layout_location
+                            )
+                        )
                     else:
-                        sorted_texts_hybrid = self.text_extractor.resort_page_text_with_center_location(hybrid_texts, page_num)
+                        sorted_texts_hybrid = (
+                            self.text_extractor
+                            .resort_page_text_with_center_location(
+                                hybrid_texts, page_num
+                            )
+                        )
 
             image_base64 = self._image_to_base64(resized_img)
 
@@ -493,7 +645,10 @@ class FileProcessor:
             return page_texts or [], images or [], []
         return [], [], []
 
-    def _filter_ocr_in_image_regions(self, ocr_results: List[Any], image_bboxes: List[List[float]]) -> List[Dict[str, Any]]:
+    def _filter_ocr_in_image_regions(
+            self, ocr_results: List[Any],
+            image_bboxes: List[List[float]]
+    ) -> List[Dict[str, Any]]:
         """Filter OCR blocks whose center falls in an image bbox region."""
         ocr_in_images = []
         for item in ocr_results:
@@ -533,7 +688,10 @@ class FileProcessor:
             text = file.read()
         return [{'text': text}]
 
-    def _blackout_text(self, image: np.ndarray, page_text: List[Dict], color=(0, 0, 0)) -> np.ndarray:
+    def _blackout_text(
+            self, image: np.ndarray,
+            page_text: List[Dict], color=(0, 0, 0)
+    ) -> np.ndarray:
         """Black out text regions in image"""
 
         for item in page_text:

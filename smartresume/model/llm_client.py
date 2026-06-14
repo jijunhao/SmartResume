@@ -70,7 +70,10 @@ class LLMClient:
                     pass
 
     def _init_direct_model(self) -> None:
-        """Initialize direct model loading. Prefer vLLM (LLM, SamplingParams), fallback to transformers."""
+        """Initialize direct model loading.
+
+        Prefer vLLM (LLM, SamplingParams), fallback to transformers.
+        """
         if not self.use_direct_models:
             return
         if not (VLLM_AVAILABLE or TRANSFORMERS_AVAILABLE):
@@ -83,7 +86,11 @@ class LLMClient:
                 return
 
             local_model_path = None
-            models_dir = getattr(config, 'model_download', {}).get('models_dir', {}).get('llm', 'models')
+            models_dir = (
+                getattr(config, 'model_download', {})
+                .get('models_dir', {})
+                .get('llm', 'models')
+            )
 
             if os.path.exists(direct_model_name):
                 local_model_path = direct_model_name
@@ -155,6 +162,7 @@ class LLMClient:
 
             if not TRANSFORMERS_AVAILABLE:
                 return
+            self._max_model_len = getattr(config, 'vllm_max_model_len', 32768)
             device = "cuda" if torch.cuda.is_available() else "cpu"
             self.direct_model = AutoModelForCausalLM.from_pretrained(
                 local_model_path,
@@ -176,12 +184,21 @@ class LLMClient:
 
     def _get_client(self, extract_type: str, use_backup_channel: bool = False) -> OpenAI:
         """Get the client for a given extraction type"""
-        if use_backup_channel and hasattr(config, 'extract_channels_backup') and config.extract_channels_backup:
-            channel_name = getattr(config.extract_channels_backup, extract_type, "")
-        elif hasattr(config, 'extract_channels_main') and config.extract_channels_main:
-            channel_name = getattr(config.extract_channels_main, extract_type, "")
-        elif hasattr(config, 'extract_channels') and config.extract_channels:
-            channel_name = getattr(config.extract_channels, extract_type, "")
+        has_backup = hasattr(config, 'extract_channels_backup') and config.extract_channels_backup
+        has_main = hasattr(config, 'extract_channels_main') and config.extract_channels_main
+        has_default = hasattr(config, 'extract_channels') and config.extract_channels
+        if use_backup_channel and has_backup:
+            channel_name = getattr(
+                config.extract_channels_backup, extract_type, ""
+            )
+        elif has_main:
+            channel_name = getattr(
+                config.extract_channels_main, extract_type, ""
+            )
+        elif has_default:
+            channel_name = getattr(
+                config.extract_channels, extract_type, ""
+            )
         else:
             channel_name = ""
 
@@ -190,14 +207,26 @@ class LLMClient:
         else:
             return self.default_client
 
-    def _get_channel_config(self, extract_type: str, use_backup_channel: bool = False) -> Any:
-        """Get the channel configuration for a given extraction type"""
-        if use_backup_channel and hasattr(config, 'extract_channels_backup') and config.extract_channels_backup:
-            channel_name = getattr(config.extract_channels_backup, extract_type, "")
-        elif hasattr(config, 'extract_channels_main') and config.extract_channels_main:
-            channel_name = getattr(config.extract_channels_main, extract_type, "")
-        elif hasattr(config, 'extract_channels') and config.extract_channels:
-            channel_name = getattr(config.extract_channels, extract_type, "")
+    def _get_channel_config(
+        self, extract_type: str,
+        use_backup_channel: bool = False
+    ) -> Any:
+        """Get channel configuration for a given extraction type"""
+        has_backup = hasattr(config, 'extract_channels_backup') and config.extract_channels_backup
+        has_main = hasattr(config, 'extract_channels_main') and config.extract_channels_main
+        has_default = hasattr(config, 'extract_channels') and config.extract_channels
+        if use_backup_channel and has_backup:
+            channel_name = getattr(
+                config.extract_channels_backup, extract_type, ""
+            )
+        elif has_main:
+            channel_name = getattr(
+                config.extract_channels_main, extract_type, ""
+            )
+        elif has_default:
+            channel_name = getattr(
+                config.extract_channels, extract_type, ""
+            )
         else:
             channel_name = ""
 
@@ -354,7 +383,9 @@ class LLMClient:
                 user_prompt = text_content
 
                 # Format prompt based on model type
-                if hasattr(self.direct_tokenizer, 'chat_template') and self.direct_tokenizer.chat_template:
+                tokenizer_has_tpl = hasattr(self.direct_tokenizer, 'chat_template')
+                has_chat_tpl = tokenizer_has_tpl and self.direct_tokenizer.chat_template
+                if has_chat_tpl:
                     # Use chat template if available
                     messages = [
                         {"role": "system", "content": system_prompt},
@@ -477,7 +508,8 @@ class LLMClient:
             # Direct mode enabled but model not loaded: do not fall back to vLLM API
             raise RuntimeError(
                 "use_direct_models is True but direct model failed to load. "
-                "Please set direct_model_name in config and ensure vLLM (or transformers) is installed. "
+                "Please set direct_model_name in config and ensure "
+                "vLLM (or transformers) is installed. "
                 "Do not start vLLM API server—vLLM is used as an in-process library only."
             )
 

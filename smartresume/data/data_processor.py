@@ -56,7 +56,12 @@ class DataProcessor:
                 result.append(char)
         return ''.join(result)
 
-    def build_text_content(self, processed_data: List[Dict[str, Any]], resume_id: str = "", use_hybrid_text: bool = False) -> Tuple[List[str], str, str]:
+    def build_text_content(
+        self,
+        processed_data: List[Dict[str, Any]],
+        resume_id: str = "",
+        use_hybrid_text: bool = False,
+    ) -> Tuple[List[str], str, str]:
         """
         Build text content from processed data.
 
@@ -108,7 +113,10 @@ class DataProcessor:
 
         text = unicodedata.normalize('NFKC', text)
 
-        text = re.sub(r'[\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\u00A7]', ' ', text)
+        text = re.sub(
+            r'[\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\u00A7]',
+            ' ', text
+        )
 
         text = re.sub(r' {2,}', ' ', text)
 
@@ -148,7 +156,12 @@ class DataProcessor:
         ]
         return '\n'.join(indexed_text_lines)
 
-    def post_process(self, text_lines: List[str], structure_output: Dict[str, Any], processed_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def post_process(
+        self,
+        text_lines: List[str],
+        structure_output: Dict[str, Any],
+        processed_data: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
         """
         Post-process structured output.
 
@@ -177,7 +190,10 @@ class DataProcessor:
         except Exception:
             return structure_output
 
-    def process_resume_data(self, raw_data: Dict[str, Any], text_lines: List[str]) -> Dict[str, Any]:
+    def process_resume_data(
+        self, raw_data: Dict[str, Any],
+        text_lines: List[str],
+    ) -> Dict[str, Any]:
         """
         Process raw resume data.
 
@@ -193,16 +209,28 @@ class DataProcessor:
 
             if 'basicInfo' in raw_data:
                 processed_data['basicInfo'] = self._process_basic_info(raw_data['basicInfo'])
-                processed_data['basicInfo']['workYears'] = self._calculate_work_years(raw_data, text_lines)
-                processed_data['basicInfo']['highestEducation'] = self._extract_highest_education(raw_data)
+                processed_data['basicInfo']['workYears'] = (
+                    self._calculate_work_years(raw_data, text_lines)
+                )
+                processed_data['basicInfo']['highestEducation'] = (
+                    self._extract_highest_education(raw_data)
+                )
                 extracted_id = self._extract_id_card_from_text(text_lines)
                 processed_data['basicInfo']['idCard'] = extracted_id
 
             if 'workExperience' in raw_data:
-                processed_data['workExperience'] = self._process_work_experience(raw_data['workExperience'], text_lines)
+                processed_data['workExperience'] = (
+                    self._process_work_experience(
+                        raw_data['workExperience'], text_lines
+                    )
+                )
 
             if 'education' in raw_data:
-                processed_data['education'] = self._process_education(raw_data['education'], text_lines)
+                processed_data['education'] = (
+                    self._process_education(
+                        raw_data['education'], text_lines
+                    )
+                )
 
             self._validate_fields_in_text(processed_data, text_lines)
 
@@ -237,7 +265,10 @@ class DataProcessor:
 
         return processed
 
-    def _process_work_experience(self, work_exp: List[Dict[str, Any]], text_lines: List[str]) -> List[Dict[str, Any]]:
+    def _process_work_experience(
+        self, work_exp: List[Dict[str, Any]],
+        text_lines: List[str],
+    ) -> List[Dict[str, Any]]:
         """Process work experience"""
         processed_list = []
 
@@ -251,25 +282,40 @@ class DataProcessor:
                 processed_exp['position'] = self._clean_text(exp['position'])
 
             if 'employmentPeriod' in exp:
-                processed_exp['employmentPeriod'] = self._process_time_period(exp['employmentPeriod'])
+                processed_exp['employmentPeriod'] = (
+                    self._process_time_period(exp['employmentPeriod'])
+                )
 
             if 'jobDescription_refer_index_range' in exp:
-                processed_exp['jobDescription_refer_index_range'] = exp['jobDescription_refer_index_range']
-                processed_exp['jobDescription'] = self._extract_description_from_range(
-                    exp['jobDescription_refer_index_range'], text_lines, processed_exp['companyName'], processed_exp["position"]
+                processed_exp['jobDescription_refer_index_range'] = (
+                    exp['jobDescription_refer_index_range']
+                )
+                processed_exp['jobDescription'] = (
+                    self._extract_description_from_range(
+                        exp['jobDescription_refer_index_range'],
+                        text_lines,
+                        processed_exp['companyName'],
+                        processed_exp["position"],
+                    )
                 )
             elif 'jobDescription' in exp:
                 processed_exp['jobDescription'] = self._clean_description(exp['jobDescription'])
 
             for key, value in exp.items():
                 if key not in processed_exp:
-                    processed_exp[key] = self._clean_text(value) if isinstance(value, str) else value
+                    processed_exp[key] = (
+                        self._clean_text(value)
+                        if isinstance(value, str) else value
+                    )
 
             processed_list.append(processed_exp)
 
         return processed_list
 
-    def _process_education(self, education: List[Dict[str, Any]], text_lines: List[str]) -> List[Dict[str, Any]]:
+    def _process_education(
+        self, education: List[Dict[str, Any]],
+        text_lines: List[str],
+    ) -> List[Dict[str, Any]]:
         """Process education"""
         processed_list = []
 
@@ -295,7 +341,10 @@ class DataProcessor:
 
             for key, value in edu.items():
                 if key not in processed_edu:
-                    processed_edu[key] = self._clean_text(value) if isinstance(value, str) else value
+                    processed_edu[key] = (
+                        self._clean_text(value)
+                        if isinstance(value, str) else value
+                    )
 
             processed_list.append(processed_edu)
 
@@ -309,7 +358,11 @@ class DataProcessor:
         email = email.replace(".c0m", ".com").replace(".c0.cn", ".co.cn")
         email = email.replace("gmai1.com", "gmail.com").replace("gmai1.cn", "gmail.cn")
         email = email.replace("hotmai1.com", "hotmail.com")
-        email = email.replace("163.c0m", "163.com").replace("126.c0m", "126.com").replace("qq.c0m", "qq.com")
+        email = (
+            email.replace("163.c0m", "163.com")
+            .replace("126.c0m", "126.com")
+            .replace("qq.c0m", "qq.com")
+        )
         email = email.replace("gq.com", "qq.com")
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if re.match(email_pattern, email):
@@ -416,7 +469,11 @@ class DataProcessor:
             return self._clean_id_card(match.group(0))
         return ""
 
-    def _extract_description_from_range(self, index_range: List[int], text_lines: List[str], name: str, position: str) -> str:
+    def _extract_description_from_range(
+        self, index_range: List[int],
+        text_lines: List[str],
+        name: str, position: str,
+    ) -> str:
         """
         Extract description from original text based on index range.
 
@@ -443,8 +500,18 @@ class DataProcessor:
             if config.processing.remove_position_and_company_line:
                 normalized_name = self._normalize_unicode(name)
                 normalized_position = self._normalize_unicode(position)
-                extracted_lines = [line for line in extracted_lines if normalized_name != self._normalize_unicode(line) or normalized_position != self._normalize_unicode(line)]
-                extracted_lines = [line for line in extracted_lines if not (normalized_name in self._normalize_unicode(line) and normalized_position in self._normalize_unicode(line))]
+                extracted_lines = [
+                    line for line in extracted_lines
+                    if self._keep_line_name_or_position(
+                        normalized_name, normalized_position, line
+                    )
+                ]
+                extracted_lines = [
+                    line for line in extracted_lines
+                    if not self._line_contains_name_and_position(
+                        normalized_name, normalized_position, line
+                    )
+                ]
 
             if len(extracted_lines) == 0:
                 return ""
@@ -455,6 +522,22 @@ class DataProcessor:
 
         except Exception:
             return ""
+
+    def _keep_line_name_or_position(
+        self, normalized_name: str, normalized_position: str, line: str,
+    ) -> bool:
+        """Return True unless the line exactly matches both name and position."""
+        norm_line = self._normalize_unicode(line)
+        name_differs = (normalized_name != norm_line)
+        position_differs = (normalized_position != norm_line)
+        return name_differs or position_differs
+
+    def _line_contains_name_and_position(
+        self, normalized_name: str, normalized_position: str, line: str,
+    ) -> bool:
+        """Return True if the line contains both name and position."""
+        norm_line = self._normalize_unicode(line)
+        return normalized_name in norm_line and normalized_position in norm_line
 
     def _clean_description(self, description: str, text_lines: List[str] = None) -> str:
         """Clean description text"""
@@ -566,17 +649,25 @@ class DataProcessor:
         return unicodedata.normalize('NFKC', text).strip()
 
     def _normalize_for_basic_info(self, text: str) -> str:
-        """Normalize for basicInfo (name, phone): strip spaces/newlines and punctuation, keep alphanumeric and Chinese."""
+        """Normalize for basicInfo (name, phone): strip
+        spaces/newlines and punctuation, keep alphanumeric
+        and Chinese."""
         if not text:
             return ""
         normalized = str(text).replace("\n", "").replace("\r", "")
         normalized = re.sub(r'\s+', '', normalized)
-        chinese_punctuation = '！？｡。＂＃＄％＆＇（）＊＋，－／：；＜＝＞＠［＼］＾＿｀｛｜｝～｟｠｢｣､、〃》「」『』【】〔〕〖〗〘〙〚〛〜〝〞〟〰〾〿–—''‛""„‟…‧﹏·'
+        chinese_punctuation = (
+            '！？｡。＂＃＄％＆＇（）＊＋，－／：；＜＝＞＠［＼］＾＿｀｛｜｝～｟｠｢｣'
+            '､、〃》「」『』【】〔〕〖〗〘〙〚〛〜〝〞〟〰〾〿–—''‛""„‟…‧﹏·'
+        )
         for punct in string.punctuation + chinese_punctuation:
             normalized = normalized.replace(punct, '')
         return ''.join(c for c in normalized if c.isalnum() or '\u4e00' <= c <= '\u9fff')
 
-    def _validate_fields_in_text(self, processed_data: Dict[str, Any], text_lines: List[str]) -> None:
+    def _validate_fields_in_text(
+        self, processed_data: Dict[str, Any],
+        text_lines: List[str],
+    ) -> None:
         """
         Validate that key fields appear in the original text; remove otherwise.
         """
@@ -604,8 +695,10 @@ class DataProcessor:
                 normalized_company_name = self._normalize_for_comparison(company_name)
                 normalized_position = self._normalize_for_comparison(position)
 
-                if ((normalized_company_name and normalized_company_name in normalized_full_text) or
-                        (normalized_position and normalized_position in normalized_full_text)):
+                nft = normalized_full_text
+                company_found = normalized_company_name and normalized_company_name in nft
+                position_found = normalized_position and normalized_position in nft
+                if company_found or position_found:
                     valid_works.append(work)
 
             processed_data['workExperience'] = valid_works
@@ -619,8 +712,9 @@ class DataProcessor:
                 normalized_school = self._normalize_for_comparison(school)
                 normalized_major = self._normalize_for_comparison(major)
 
-                if ((normalized_school and normalized_school in normalized_full_text) or
-                        (normalized_major and normalized_major in normalized_full_text)):
+                school_found = normalized_school and normalized_school in normalized_full_text
+                major_found = normalized_major and normalized_major in normalized_full_text
+                if school_found or major_found:
                     valid_educations.append(edu)
 
             processed_data['education'] = valid_educations
@@ -664,7 +758,8 @@ class DataProcessor:
                 end = per.get('endDate')
                 if end and str(end).strip() and str(end) not in ('至今', 'present', '现在', '目前'):
                     y = self._extract_year_from_date(end)
-                    if y is not None and (latest_graduation_year is None or y > latest_graduation_year):
+                    is_newer = latest_graduation_year is None or y > latest_graduation_year
+                    if y is not None and is_newer:
                         latest_graduation_year = y
         if latest_graduation_year is not None:
             return current_year - latest_graduation_year
@@ -683,7 +778,10 @@ class DataProcessor:
             return '大专'
         return degree_text
 
-    def _standardize_education_level(self, degree_level: str, education_keywords: Dict[str, List[str]]) -> str:
+    def _standardize_education_level(
+        self, degree_level: str,
+        education_keywords: Dict[str, List[str]],
+    ) -> str:
         """Map degree level to standard key using keyword list."""
         if not degree_level:
             return ""
@@ -701,14 +799,19 @@ class DataProcessor:
         educations = raw_data['education']
         education_priority = {
             'DOCTOR': 1, 'MASTER': 2, 'BACHELOR': 3, 'ASSOCIATE': 4,
-            'VOCATIONAL_SECONDARY': 5, 'HIGH_SCHOOL': 6, 'JUNIOR_HIGH_SCHOOL': 7, 'PRIMARY_SCHOOL': 8
+            'VOCATIONAL_SECONDARY': 5, 'HIGH_SCHOOL': 6,
+            'JUNIOR_HIGH_SCHOOL': 7, 'PRIMARY_SCHOOL': 8
         }
         education_keywords = {
             'DOCTOR': ['博士', 'phd', 'doctor', '博士研究生'],
             'MASTER': ['硕士', '研究生', 'master', '硕士研究生'],
             'BACHELOR': ['本科', 'bachelor', '学士', '本科生'],
             'ASSOCIATE': ['专科', '大专', 'associate', '专科生'],
-            'VOCATIONAL_SECONDARY': ['中专', '中等专业学校', 'vocational high school', 'secondary vocational school'],
+            'VOCATIONAL_SECONDARY': [
+                '中专', '中等专业学校',
+                'vocational high school',
+                'secondary vocational school',
+            ],
             'HIGH_SCHOOL': ['高中', 'high', '高级中学', '中学'],
             'JUNIOR_HIGH_SCHOOL': ['初中', '初级中学'],
             'PRIMARY_SCHOOL': ['小学', '初等教育']
@@ -723,7 +826,10 @@ class DataProcessor:
                     latest_year = y
                     latest_education = edu
         if latest_education:
-            std = self._standardize_education_level(latest_education.get('degreeLevel', ''), education_keywords)
+            std = self._standardize_education_level(
+                latest_education.get('degreeLevel', ''),
+                education_keywords,
+            )
             if std:
                 return std
         highest_priority = 999
